@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>疫情信息可视化</title>
+    <script src="https://cdn.staticfile.org/echarts/5.3.0/echarts.min.js"></script>
+<!--    <script src="js/echarts.js"></script>-->
+    <script src="js/china.js"></script>
+    <script src="js/jquery.js"></script>
+    <link href="css/bootstrap.css" rel="stylesheet"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        #main {
+            width: 600px;
+            height: 450px;
+            margin: 150px auto;
+            border: 1px solid #ddd;
+        }
+
+        /*默认长宽比0.75*/
+        .center {
+            margin: auto;
+            width: 70%;
+        }
+    </style>
+
+
+</head>
+<body>
+<div>
+    <h2 align="center">实时疫情信息可视化平台</h2>
+</div>
+<!--<div class="container">-->
+<!--    <div class="row">-->
+<!--        <div class="col-sm">-->
+<!--            <div id="map_all" style="height:500px;" class="center"></div>-->
+<!--        </div>-->
+<!--        <div class="col-sm">-->
+<!--            <div id="time_line" style="height:500px;" class="center"></div>-->
+<!--        </div>-->
+<!--        <div class="col-sm">-->
+<!--            <div id="import_pie" style="height:400px;" class="center"></div>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--</div>-->
+
+    <br>
+    <hr>
+<div id="map_all" style="height:600px;" class="center"></div>
+    <br>
+    <hr>
+<div id="time_line" style="height:600px;" class="center"></div>
+    <br>
+    <hr>
+<div id="import_pie" style="height:600px;" class="center"></div>
+    <br>
+    <hr>
+<div id="covid19_material" style="height:600px;" class="center"></div>
+<br>
+<hr>
+<div id="dangerAreas_pie" style="height:600px;" class="center"></div>
+<br>
+<hr>
+<div id="orgCount_chart" style="height:600px;" class="center"></div>
+</body>
+
+<script type="text/javascript">
+
+    /*--------------------全国地图-----------------------------*/
+    var dataList=[
+    ]
+    var myMapChart = echarts.init(document.getElementById('map_all'));
+    function randomValue() {
+        return Math.round(Math.random()*1000);
+    }
+    myMapChart.setOption({
+        title: {
+            text: '全国疫情地图'
+        },
+        tooltip: {
+            formatter:function(params,ticket, callback){
+                return params.seriesName+'<br />'+params.name+'：'+params.value
+            }
+        },
+        visualMap: {
+            min: 0,
+            max: 1500,
+            left: 'left',
+            top: 'bottom',
+            text: ['多','少'],
+            inRange: {
+                color: ['#ffe5bf', '#ffa372', '#ff7e86','#ee1216','#B22222']
+            },
+            show:true
+        },
+        geo: {
+            map: 'china',
+            roam: false,//不开启缩放和平移
+            zoom:1.23,//视角缩放比例
+            label: {
+                normal: {
+                    show: true,
+                    fontSize:'10',
+                    color: 'rgba(0,0,0,0.7)'
+                }
+            },
+            itemStyle: {
+                normal:{
+                    borderColor: 'rgba(0, 0, 0, 0.2)'
+                },
+                emphasis:{
+                    areaColor: '#AEEEEE',//鼠标悬停区域颜色
+                    shadowOffsetX: 0,
+                    shadowOffsetY: 0,
+                    shadowBlur: 20,
+                    borderWidth: 0,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        },
+        series : [
+            {
+                name: '累计确诊',
+                type: 'map',
+                geoIndex: 0,
+                data:dataList
+
+            }
+        ]
+    });
+
+    myMapChart.on('click', function (params) {
+        alert(params.name+"累计确诊"+params.value);
+    });
+
+    setTimeout(function () {
+        // 异步加载json格式数据
+        $.getJSON('http://localhost:8080/covid19/getNationalMapData', function(data) {
+            myMapChart.setOption({
+                series: [{
+                    data: data.data
+                }]
+            });
+        });
+    }, 1000)
+
+
+    /*--------------------时间趋势折线图-----------------------------*/
+    var myLineChart = echarts.init(document.getElementById("time_line"));
+    myLineChart.setOption({
+        title: {
+            text: '疫情趋势'
+        },
+        tooltip: {
+            trigger: 'axis'
+        },
+        legend: {
+            data: ['新增确诊', '累计确诊', '疑似病例', '累计治愈', '累计死亡']
+        },
+        dataset: {
+            // 这里指定了维度名的顺序，从而可以利用默认的维度到坐标轴的映射。
+            dimensions: ['dateId', '新增确诊', '累计确诊', '疑似病例', '累计治愈', '累计死亡'],
+            source: []
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        toolbox: {
+            feature: {
+                saveAsImage: {}
+            }
+        },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: []
+        },
+        yAxis: {
+            type: 'value'
+        },
+        series: [
+            {type: 'line'},
+            {type: 'line'},
+            {type: 'line'},
+            {type: 'line'},
+            {type: 'line'}
+        ]
+    });
+
+
+    var xdata2 = [];//x轴
+    $.getJSON('http://localhost:8080/covid19/getCovidTimeData', function (data) {
+        var arr = data.data
+        for (var i = 0; i < arr.length; i++) {
+            xdata2.push(arr[i].dateId)
+        }
+        myLineChart.setOption({
+            dataset: {
+                source: data.data
+            },
+            xAxis: {
+                data: xdata2
+            }
+        })
+    })
+
+
+
+    /*--------------------境外输入饼图-----------------------------*/
+    var myPieChart = echarts.init(document.getElementById("import_pie"));
+    myPieChart.setOption({
+        title: {
+            text: '境外输入统计'
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b} : {c} ({d}%)'
+        },
+        legend: {
+            type: 'scroll',
+            orient: 'vertical',
+            right: 10,
+            top: 20,
+            bottom: 20,
+        },
+        series : [
+            {
+                name: '境外输入',
+                type: 'pie',    // 设置图表类型为饼图
+                radius: '70%',  // 饼图的半径
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowOffsetX: 0,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                    }
+                },
+                data:[          // 数据数组，name 为数据项名称，value 为数据项值
+                ]
+            }
+        ]
+    })
+    $.getJSON('http://localhost:8080/covid19/getCovidImportData', function (data) {
+        myPieChart.setOption({
+            series:[{
+                data: data.data
+            }]
+        })
+    })
+
+    /*--------------------救援物资-----------------------------*/
+    // 基于准备好的dom，初始化echarts实例
+    var myChart = echarts.init(document.getElementById('covid19_material'));
+    myChart.setOption({
+        title: {
+            text: '救援物资'
+        },
+        legend: {},
+        tooltip: {},
+        dataset: {
+            // 这里指定了维度名的顺序，从而可以利用默认的维度到坐标轴的映射。
+            dimensions: ['name', '采购', '下拨', '捐赠', '消耗', '需求', '库存'],
+            source: []
+        },
+        xAxis: {
+            type: 'category',
+            data: []
+        },
+        yAxis: {},
+        series: [
+            {type: 'bar'},
+            {type: 'bar'},
+            {type: 'bar'},
+            {type: 'bar'},
+            {type: 'bar'},
+            {type: 'bar'}
+        ]
+    });
+
+    var xdata = [];//x轴
+    $.getJSON("http://localhost:8080/covid19/getCovidMaterial", function (data) {
+        var arr = data.data
+        for (var i = 0; i < arr.length; i++) {
+            xdata.push(arr[i].name)
+        }
+        console.log(xdata)
+        myChart.setOption({
+            dataset: {
+                source: data.data
+            },
+            xAxis: {
+                data: xdata
+            }
+        })
+    });
+
+    /*--------------------中高风险地区-----------------------------*/
+    // 基于准备好的dom，初始化echarts实例
+    var dangerAreasChart = echarts.init(document.getElementById('dangerAreas_pie'));
+    // 指定图表的配置项和数据
+    dangerAreasChart.setOption({
+        title: {
+            text: ''
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+            data: [
+            ]
+        },
+        series: [
+            {
+                name: '高风险',
+                type: 'pie',
+                selectedMode: 'single',
+                radius: [0, '30%'],
+                label: {
+                    position: 'inner',
+                    fontSize: 14
+                },
+                labelLine: {
+                    show: false
+                },
+                data: [
+                ]
+            },
+            {
+                name: '中风险',
+                type: 'pie',
+                radius: ['40%', '60%'],
+                labelLine: {
+                    length: 30
+                },
+                label: {
+                    formatter: '{a|{a}}{abg|}\n{hr|}\n  {b|{b}：}{c}  {per|{d}%}  ',
+                    backgroundColor: '#F6F8FC',
+                    borderColor: '#8C8D8E',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    rich: {
+                        a: {
+                            color: '#6E7079',
+                            lineHeight: 18,
+                            align: 'center'
+                        },
+                        hr: {
+                            borderColor: '#8C8D8E',
+                            width: '100%',
+                            borderWidth: 1,
+                            height: 0
+                        },
+                        b: {
+                            color: '#4C5058',
+                            fontSize: 13,
+                            fontWeight: 'bold',
+                            lineHeight: 28
+                        },
+                        per: {
+                            color: '#fff',
+                            backgroundColor: '#4C5058',
+                            padding: [3, 4],
+                            borderRadius: 4
+                        }
+                    }
+                },
+                data: [
+                ]
+            }
+        ]
+    })
+    $.getJSON('http://localhost:8080/covid19/getHighDangerData', function (data) {
+        dangerAreasChart.setOption({
+            series:[{
+                data: data.data
+            }]
+        })
+    })
+    $.getJSON('http://localhost:8080/covid19/getMidDangerData', function (data) {
+        dangerAreasChart.setOption({
+            legend: {
+                data: data.data.name
+            },
+            series:[{}, {
+                data: data.data
+            }]
+        })
+    })
+
+    /*--------------------核酸检测点和疫苗接种点-----------------------------*/
+    // 基于准备好的dom，初始化echarts实例
+    var orgChart = echarts.init(document.getElementById('orgCount_chart'));
+    var list = [];
+    // 指定图表的配置项和数据
+    orgChart.setOption({
+        title: {
+            text: '核酸检测点和疫苗接种点'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                // Use axis to trigger tooltip
+                type: 'shadow' // 'shadow' as default; can also be 'line' or 'shadow'
+            }
+        },
+        legend: {},
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'value'
+        },
+        yAxis: {
+            type: 'category',
+            // data: []
+        },
+        series: [
+        ]
+    })
+    $.getJSON('http://localhost:8080/covid19/getDetectOrgData', function (data) {
+        for (var i = 0, size = data.data.length; i < size; i++) {
+            list.push(data.data[i].name)
+        }
+        orgChart.setOption({
+            yAxis: {
+                data: list
+            },
+            series: [
+                {
+                    name: '核酸检测点',
+                    type: 'bar',
+                    stack: 'total',
+                    label: {
+                        show: true
+                    },
+                    emphasis: {
+                        focus: 'series'
+                    },
+                    data: data.data
+                }]
+        })
+        $.getJSON('http://localhost:8080/covid19/getVaccinationOrgData', function (data) {
+            var list2 = [];
+            for (var i = 0, size = data.data.length; i < size; i++) {
+                var t = list.indexOf(data.data[i].name);
+                if(t!=-1)
+                {list2[t]=data.data[i].value}
+                // console.log(data.data[i].name)
+            }
+            // console.log(list2)
+            orgChart.setOption({
+                series: [
+                    {},
+                    {
+                        name: '疫苗接种点',
+                        type: 'bar',
+                        stack: 'total',
+                        label: {
+                            show: true
+                        },
+                        emphasis: {
+                            focus: 'series'
+                        },
+                        data:list2
+                    }]
+            })
+        })
+    })
+</script>
+</html>
